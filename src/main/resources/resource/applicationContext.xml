@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" 
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+    
+    <!-- Spring管理的对象 Service,Dao,数据源，事务 -->
+	<!-- 注册组件扫描器（扫描的Service包） -->
+	<context:component-scan base-package="com.bl.service,com.bl.util" />
+
+    <!-- 引入属性配置文件 -->
+    <context:property-placeholder location="classpath:resource/db.properties"/>
+	<!--ali-->
+	<bean id="logFilter" class="com.alibaba.druid.filter.logging.Slf4jLogFilter">
+		<property name="statementExecutableSqlLogEnable" value="true"/>
+	</bean>
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		  destroy-method="close">
+		<property name="driverClassName" value="${jdbc.driverClassName}"/>
+		<property name="url" value="${jdbc.url}"/>
+		<property name="username" value="${jdbc.username}"/>
+		<property name="password" value="${jdbc.password}"/>
+		<!-- 配置初始化大小、最小、最大 -->
+		<property name="initialSize" value="${jdbc.initialSize}"/>
+		<property name="minIdle" value="1"/>
+		<property name="maxActive" value="${jdbc.maxActive}"/>
+		<!-- 配置获取连接等待超时的时间 -->
+		<property name="maxWait" value="60000"/>
+		<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+		<property name="timeBetweenEvictionRunsMillis" value="60000"/>
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+		<property name="minEvictableIdleTimeMillis" value="300000"/>
+		<property name="validationQuery" value="SELECT 'x' from dual"/>
+		<property name="testWhileIdle" value="true"/>
+		<property name="testOnBorrow" value="false"/>
+		<property name="testOnReturn" value="false"/>
+		<!-- 配置监控统计拦截的filters -->
+		<property name="filters" value="stat"/>
+		<property name="proxyFilters">
+			<list>
+				<ref bean="logFilter"/>
+			</list>
+		</property>
+	</bean>
+	<!--ali-->
+    <!-- 注册Dao对象， 使用MyBatis的动态代理对象 -->
+    <!-- 注册SqlSessionFactory -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean" >
+    	<property name="dataSource" ref="dataSource" />
+    	<property name="configLocation" value="classpath:resource/mybatis.xml" />
+		<property name="mapperLocations" value="classpath*:resource/mapper/*.xml" />
+    </bean>
+    
+    <!-- 注册动态代理扫描器：Dao接口的代理对象 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+    	<!-- 指定SqlSessionFactorty -->
+    	<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+    	<!-- 指定Dao接口的bao -->
+    	<property name="basePackage" value="com.bl.dao" />
+    </bean>
+    
+    <!-- 事务 AspectJ -->
+    <!-- 注册事务管理器 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    	<property name="dataSource" ref="dataSource" />
+    </bean>
+    
+    <!-- 注册事务的通知 -->
+    <tx:advice id="myAdvice" transaction-manager="transactionManager">
+        <!-- 指定事务的特性 -->
+    	<tx:attributes>
+    		<tx:method name="*" isolation="DEFAULT" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+    		<tx:method name="query*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
+    	</tx:attributes>
+    </tx:advice>
+    
+    <aop:config>
+       <aop:pointcut expression="execution(* *..service.impl.*.*(..))" id="servicePt"/>
+       <aop:advisor advice-ref="myAdvice" pointcut-ref="servicePt"/>
+    </aop:config>  
+    
+    
+</beans>
